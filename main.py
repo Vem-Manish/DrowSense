@@ -7,11 +7,37 @@ from PIL import Image
 import numpy as np
 import time
 import os
+import winsound
 
 # --- CONFIGURATION ---
 EYE_MODEL_PATH = "mobilenet_v3_best.pth"
 YAWN_MODEL_PATH = "yawn_model_2.pth"
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+# --- SOUND FILES ---
+ALERT_SOUND = "alert.wav"
+YAWN_SOUND = "yawn.wav"
+HEAD_SOUND = "danger.wav"
+
+# --- SOUND STATE (ADDED) ---
+is_sound_playing = False
+current_sound = None
+
+# --- SOUND FUNCTIONS (UPDATED) ---
+def play_loop(sound_file):
+    global is_sound_playing, current_sound
+    if not is_sound_playing or current_sound != sound_file:
+        winsound.PlaySound(None, winsound.SND_PURGE)
+        winsound.PlaySound(sound_file, winsound.SND_FILENAME | winsound.SND_ASYNC | winsound.SND_LOOP)
+        is_sound_playing = True
+        current_sound = sound_file
+
+
+def stop_sound():
+    global is_sound_playing, current_sound
+    winsound.PlaySound(None, winsound.SND_PURGE)
+    is_sound_playing = False
+    current_sound = None
 
 # --- THRESHOLDS ---
 EYE_THRESHOLD = 0.40
@@ -210,6 +236,8 @@ def predict(model, img_bgr):
 
 # --- MAIN LOOP ---
 def main():
+    global last_alert_time
+
     eye_model = load_mobilenet_v3(EYE_MODEL_PATH)
     yawn_model = load_yawn_model_advanced(YAWN_MODEL_PATH)
 
@@ -291,15 +319,22 @@ def main():
                 cv2.putText(frame, f"Y:{score_yawn:.2f}", (mouth_box[0], mouth_box[1] - 5),
                             cv2.FONT_HERSHEY_SIMPLEX, 0.4, m_color, 1)
 
-                # --- PRIORITY ---
+                # --- PRIORITY (UPDATED ONLY THIS PART) ---
                 if head_drop_active:
-                    pass
+                    play_loop(HEAD_SOUND)
+
                 elif is_yawning:
                     main_alert_text = f"YAWN DETECTED!"
                     main_alert_color = (0, 255, 255)
+                    play_loop(YAWN_SOUND)
+
                 elif is_drowsy:
                     main_alert_text = "DROWSINESS DETECTED!"
                     main_alert_color = (0, 0, 255)
+                    play_loop(ALERT_SOUND)
+
+                else:
+                    stop_sound()
 
         text_size = cv2.getTextSize(main_alert_text, cv2.FONT_HERSHEY_SIMPLEX, 1.2, 3)[0]
         text_x = (frame.shape[1] - text_size[0]) // 2
