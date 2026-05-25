@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DrowSense Telemetry Dashboard</title>
+    <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=Roboto+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <style>
+        :root { --bg-main: #050507; --panel-bg: #0d0d12; --border-color: #1f1f2e; --text-main: #f1f5f9; --text-muted: #64748b; --accent-blue: #3b82f6; --accent-cyan: #06b6d4; --status-green: #10b981; --status-orange: #f59e0b; --status-red: #ef4444; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Rajdhani', sans-serif; background-color: var(--bg-main); color: var(--text-main); height: 100vh; overflow: hidden; display: flex; flex-direction: column; background-image: radial-gradient(circle at 50% -20%, rgba(6, 182, 212, 0.08) 0%, transparent 50%), linear-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 1px), linear-gradient(90deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px); background-size: 100% 100%, 30px 30px, 30px 30px; }
+        header { display: flex; justify-content: space-between; align-items: center; padding: 20px 40px; border-bottom: 1px solid var(--border-color); background: rgba(13, 13, 18, 0.8); backdrop-filter: blur(10px); height: 80px; flex-shrink: 0; }
+        .brand h1 { font-size: 28px; font-weight: 700; letter-spacing: 3px; text-transform: uppercase; background: linear-gradient(90deg, #fff, var(--accent-cyan)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        .system-status-indicator { display: flex; align-items: center; gap: 10px; font-family: 'Roboto Mono', monospace; font-size: 14px; color: var(--text-muted); background: rgba(255, 255, 255, 0.03); padding: 8px 16px; border-radius: 20px; border: 1px solid var(--border-color); }
+        .pulse-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--text-muted); }
+        .pulse-dot.active { background: var(--status-green); box-shadow: 0 0 15px var(--status-green); animation: pulse 2s infinite; }
+        @keyframes pulse { 0% { opacity: 1; transform: scale(1); } 50% { opacity: 0.5; transform: scale(1.2); } 100% { opacity: 1; transform: scale(1); } }
+        .dashboard-core { display: grid; grid-template-columns: 1fr 400px; gap: 24px; padding: 24px 40px; flex-grow: 1; height: calc(100vh - 80px); }
+        .feed-container { background: var(--panel-bg); border: 1px solid var(--border-color); border-radius: 12px; position: relative; overflow: hidden; display: flex; align-items: center; justify-content: center; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5); }
+        #feed { width: 100%; height: 100%; object-fit: cover; display: none; }
+        .standby-overlay { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; color: var(--text-muted); gap: 15px; }
+        .standby-overlay svg { width: 64px; height: 64px; opacity: 0.3; }
+        .alert-vignette { position: absolute; inset: 0; pointer-events: none; transition: opacity 0.3s ease; opacity: 0; box-shadow: inset 0 0 150px rgba(239, 68, 68, 0.8); }
+        .alert-vignette.danger { opacity: 1; } .alert-vignette.warn { opacity: 1; box-shadow: inset 0 0 150px rgba(245, 158, 11, 0.6); } .alert-vignette.scan { opacity: 1; box-shadow: inset 0 0 150px rgba(6, 182, 212, 0.5); }
+        .sidebar { display: flex; flex-direction: column; gap: 20px; overflow-y: auto; padding-right: 5px; }
+        .panel { background: var(--panel-bg); border: 1px solid var(--border-color); border-radius: 12px; padding: 24px; }
+        .panel-header { font-size: 14px; color: var(--text-muted); letter-spacing: 2px; text-transform: uppercase; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255, 255, 255, 0.05); padding-bottom: 10px; }
+        .primary-status { text-align: center; padding: 10px 0; }
+        .status-text { font-size: 42px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; text-shadow: 0 0 20px rgba(255,255,255,0.1); transition: color 0.3s ease; }
+        .status-subtext { font-family: 'Roboto Mono', monospace; font-size: 12px; color: var(--text-muted); margin-top: 5px; }
+        .nn-container { width: 100%; height: 220px; background: #050505; border-radius: 8px; border: 1px solid #222; box-shadow: inset 0 0 15px #000; overflow: hidden; position: relative; }
+        #canvas3d { display: block; width: 100%; height: 100%; }
+        .nn-badge { position: absolute; top: 10px; left: 10px; font-family: 'Roboto Mono', monospace; font-size: 10px; background: rgba(6, 182, 212, 0.15); color: var(--accent-cyan); padding: 3px 8px; border-radius: 4px; border: 1px solid rgba(6, 182, 212, 0.3); z-index: 10; }
+        .data-row { margin-bottom: 16px; }
+        .data-label { display: flex; justify-content: space-between; font-size: 14px; font-weight: 600; margin-bottom: 8px; font-family: 'Roboto Mono', monospace; }
+        .data-value { color: var(--accent-cyan); }
+        .progress-track { width: 100%; height: 6px; background: #1e1e24; border-radius: 3px; overflow: hidden; position: relative; }
+        .progress-fill { height: 100%; background: var(--accent-blue); width: 0%; transition: width 0.1s linear, background-color 0.3s ease; border-radius: 3px; box-shadow: 0 0 10px var(--accent-blue); }
+        .threshold-marker { position: absolute; top: 0; bottom: 0; width: 2px; background: rgba(255,255,255,0.3); z-index: 2; }
+        .controls-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
+        button { padding: 18px; border: none; border-radius: 8px; font-family: 'Rajdhani', sans-serif; font-size: 16px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; cursor: pointer; transition: all 0.2s ease; color: #fff; }
+        .btn-start { background: linear-gradient(135deg, #10b981, #059669); box-shadow: 0 4px 15px rgba(16, 185, 129, 0.2); }
+        .btn-start:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(16, 185, 129, 0.4); }
+        .btn-stop { background: #1e1e28; border: 1px solid var(--border-color); }
+        .btn-stop:hover { background: #2a2a36; border-color: #ef4444; color: #ef4444; }
+        .text-green { color: var(--status-green); text-shadow: 0 0 15px rgba(16, 185, 129, 0.4); }
+        .text-orange { color: var(--status-orange); text-shadow: 0 0 15px rgba(245, 158, 11, 0.4); }
+        .text-red { color: var(--status-red); text-shadow: 0 0 15px rgba(239, 68, 68, 0.6); }
+        .text-cyan { color: var(--accent-cyan); text-shadow: 0 0 15px rgba(6, 182, 212, 0.5); }
+        @media (max-width: 1024px) { .dashboard-core { grid-template-columns: 1fr; overflow-y: auto; height: auto; } .feed-container { aspect-ratio: 16/9; } }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="brand"><h1>DrowSense</h1></div>
+        <div class="system-status-indicator">
+            <div class="pulse-dot" id="sys-pulse"></div>
+            <span id="sys-text">SYSTEM OFFLINE</span>
+        </div>
+    </header>
+
+    <div class="dashboard-core">
+        <div class="feed-container">
+            <div class="standby-overlay" id="standby">
+                <svg fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M6.827 6.175A2.31 2.31 0 015.186 7.23c-.38.054-.757.112-1.134.175C2.999 7.58 2.25 8.507 2.25 9.574V18a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9.574c0-1.067-.75-1.994-1.802-2.169a47.865 47.865 0 00-1.134-.175 2.31 2.31 0 01-1.64-1.055l-.822-1.316a2.192 2.192 0 00-1.736-1.039 48.774 48.774 0 00-5.232 0 2.192 2.192 0 00-1.736 1.039l-.821 1.316z"></path><path stroke-linecap="round" stroke-linejoin="round" d="M16.5 12.75a4.5 4.5 0 11-9 0 4.5 4.5 0 019 0zM18.75 10.5h.008v.008h-.008V10.5z"></path></svg>
+                <h2>AWAITING IGNITION</h2>
+            </div>
+
+            <video id="webcam" autoplay playsinline style="display: none;"></video>
+            <canvas id="captureCanvas" style="display: none;"></canvas>
+
+            <img id="feed">
+            <div class="alert-vignette" id="vignette"></div>
+        </div>
+
+        <div class="sidebar">
+            <div class="panel">
+                <div class="panel-header">System Controls</div>
+                <div class="controls-grid">
+                    <button class="btn-start" onclick="startMonitoring()">Initialize</button>
+                    <button class="btn-stop" onclick="stopMonitoring()">Halt</button>
+                </div>
+            </div>
+
+            <div class="panel">
+                <div class="panel-header">Driver Assessment</div>
+                <div class="primary-status">
+                    <div class="status-text" id="main-status">STANDBY</div>
+                    <div class="status-subtext" id="sub-status">Awaiting camera feed</div>
+                </div>
+            </div>
+
+            <div class="panel">
+                <div class="panel-header">Deep Learning Architecture</div>
+                <div class="nn-container">
+                    <div class="nn-badge">CLOUD INFERENCE CLUSTER</div>
+                    <canvas id="canvas3d"></canvas>
+                </div>
+            </div>
+
+            <div class="panel">
+                <div class="panel-header">Live Telemetry</div>
+                <div class="data-row">
+                    <div class="data-label"><span>EYE STATE (Avg)</span><span class="data-value" id="val-eye">0.00</span></div>
+                    <div class="progress-track"><div class="threshold-marker" style="left: 40%;"></div><div class="progress-fill" id="bar-eye"></div></div>
+                </div>
+                <div class="data-row">
+                    <div class="data-label"><span>YAWN DETECT</span><span class="data-value" id="val-yawn">0.00</span></div>
+                    <div class="progress-track"><div class="threshold-marker" style="left: 99%;"></div><div class="progress-fill" id="bar-yawn"></div></div>
+                </div>
+                <div class="data-row">
+                    <div class="data-label"><span>HEAD PITCH (Deg)</span><span class="data-value" id="val-pitch">0.0</span></div>
+                    <div class="progress-track"><div class="threshold-marker" style="left: 20%;"></div><div class="progress-fill" id="bar-pitch"></div></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- THREE.JS LAYERED NEURAL NETWORK ---
+        const canvas3d = document.getElementById('canvas3d');
+        const renderer = new THREE.WebGLRenderer({ canvas: canvas3d, alpha: true, antialias: true });
+        renderer.setSize(canvas3d.clientWidth, canvas3d.clientHeight);
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(45, canvas3d.clientWidth / canvas3d.clientHeight, 0.1, 100);
+        camera.position.set(0, 0, 24);
+
+        const networkGroup = new THREE.Group();
+        scene.add(networkGroup);
+        const nodeGeometry = new THREE.SphereGeometry(1, 16, 16);
+        const layerSizes = [8, 16, 16, 3];
+        const xSpacing = 4.0;
+        const layerMeshes = [];
+
+        for (let i = 0; i < layerSizes.length; i++) {
+            const numNodes = layerSizes[i];
+            const nodesInLayer = [];
+            const yOffset = (numNodes - 1) / 2;
+            for (let j = 0; j < numNodes; j++) {
+                const material = new THREE.MeshBasicMaterial({ color: 0x1e293b, transparent: true, opacity: 0.9 });
+                const sphere = new THREE.Mesh(nodeGeometry, material);
+                sphere.position.set((i - 1.5) * xSpacing, j - yOffset, 0);
+                sphere.scale.setScalar(0.2);
+                networkGroup.add(sphere);
+                nodesInLayer.push(sphere);
+            }
+            layerMeshes.push(nodesInLayer);
+        }
+
+        const lineMaterial = new THREE.LineBasicMaterial({ color: 0x334155, transparent: true, opacity: 0.2 });
+        for (let i = 0; i < layerSizes.length - 1; i++) {
+            const currentLayer = layerMeshes[i];
+            const nextLayer = layerMeshes[i + 1];
+            for (let nodeA of currentLayer) {
+                for (let nodeB of nextLayer) {
+                    const points = [nodeA.position, nodeB.position];
+                    const lineGeo = new THREE.BufferGeometry().setFromPoints(points);
+                    networkGroup.add(new THREE.Line(lineGeo, lineMaterial));
+                }
+            }
+        }
+
+        function animate3D() {
+            requestAnimationFrame(animate3D);
+            const time = Date.now() * 0.001;
+            networkGroup.rotation.y = Math.sin(time * 0.4) * 0.3;
+            networkGroup.rotation.x = Math.sin(time * 0.2) * 0.1;
+            renderer.render(scene, camera);
+        }
+        animate3D();
+
+        function updateNetwork(tensors, status) {
+            if(!tensors || tensors.length !== 32) return;
+            const avgActivity = tensors.reduce((a,b)=>a+b,0) / 32;
+            for (let j = 0; j < layerMeshes[0].length; j++) {
+                const val = avgActivity * (0.5 + Math.random() * 0.5);
+                layerMeshes[0][j].material.color.setRGB(0.1, 0.4 + val*0.4, 0.5 + val*0.5);
+                layerMeshes[0][j].scale.setScalar(0.15 + (val * 0.2));
+            }
+            let tensorIdx = 0;
+            for (let i = 1; i <= 2; i++) {
+                for (let j = 0; j < layerMeshes[i].length; j++) {
+                    const val = tensors[tensorIdx++];
+                    layerMeshes[i][j].material.color.setRGB(0.1 + (val * 0.1), 0.2 + (val * 0.8), 0.3 + (val * 0.7));
+                    layerMeshes[i][j].scale.setScalar(0.15 + (val * 0.35));
+                }
+            }
+            layerMeshes[3][0].material.color.setHex(0x112211);
+            layerMeshes[3][1].material.color.setHex(0x331111);
+            layerMeshes[3][2].material.color.setHex(0x332211);
+            layerMeshes[3].forEach(m => m.scale.setScalar(0.15));
+
+            if (status === 'active') { layerMeshes[3][0].material.color.setHex(0x10b981); layerMeshes[3][0].scale.setScalar(0.4); }
+            else if (status === 'drowsy' || status === 'head_drop') { layerMeshes[3][1].material.color.setHex(0xef4444); layerMeshes[3][1].scale.setScalar(0.5); }
+            else if (status === 'yawning') { layerMeshes[3][2].material.color.setHex(0xf59e0b); layerMeshes[3][2].scale.setScalar(0.4); }
+        }
+
+        // --- WEBSOCKET & BROWSER WEBCAM STREAMING ---
+        let ws;
+        let streamInterval;
+        const video = document.getElementById('webcam');
+        const canvas = document.getElementById('captureCanvas');
+        const ctx = canvas.getContext('2d', { willReadFrequently: true });
+
+        const dangerAudio = new Audio('danger.wav');
+        const yawnAudio = new Audio('yawn.wav');
+        dangerAudio.volume = 1.0; yawnAudio.volume = 0.7;
+        let lastState = '';
+
+        function connectWS() {
+            const protocol = location.protocol === 'https:' ? 'wss' : 'ws';
+            ws = new WebSocket(`${protocol}://${location.host}/ws`);
+
+            ws.onmessage = (event) => {
+                updateUI(JSON.parse(event.data));
+
+                // Once we receive a processed frame from the server, we snap and send the next one
+                // This prevents overloading the WebSocket (backpressure control)
+                if (video.srcObject) sendFrame();
+            };
+
+            ws.onopen = () => {
+                if (video.srcObject) sendFrame();
+            }
+        }
+
+        function sendFrame() {
+            if (ws.readyState === WebSocket.OPEN && video.readyState === video.HAVE_ENOUGH_DATA) {
+                canvas.width = video.videoWidth;
+                canvas.height = video.videoHeight;
+                ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                const base64Frame = canvas.toDataURL('image/jpeg', 0.8);
+                ws.send(base64Frame);
+            }
+        }
+
+        async function startMonitoring() {
+            try {
+                // Request Webcam Access from Browser
+                const stream = await navigator.mediaDevices.getUserMedia({ video: { width: 1280, height: 720 } });
+                video.srcObject = stream;
+
+                document.getElementById('standby').style.display = 'none';
+                document.getElementById('sys-pulse').classList.add('active');
+                document.getElementById('sys-text').innerText = "STREAMING ACTIVE";
+
+                connectWS();
+            } catch (err) {
+                alert("Camera access denied or unavailable.");
+            }
+        }
+
+        function stopMonitoring() {
+            if (video.srcObject) {
+                video.srcObject.getTracks().forEach(track => track.stop());
+                video.srcObject = null;
+            }
+            if (ws) ws.close();
+
+            document.getElementById('feed').style.display = 'none';
+            document.getElementById('standby').style.display = 'flex';
+            document.getElementById('sys-pulse').classList.remove('active');
+            document.getElementById('sys-text').innerText = "SYSTEM OFFLINE";
+            resetTelemetry();
+        }
+
+        function updateUI(data) {
+            const feed = document.getElementById('feed');
+            const mainStatus = document.getElementById('main-status');
+            const subStatus = document.getElementById('sub-status');
+            const vignette = document.getElementById('vignette');
+
+            if (data.frame) {
+                feed.src = 'data:image/jpeg;base64,' + data.frame;
+                feed.style.display = 'block';
+                if(data.nn_acts.length > 0) updateNetwork(data.nn_acts, data.status);
+            }
+
+            let avgEye = ((data.eye_l + data.eye_r) / 2).toFixed(2);
+            updateBar('eye', avgEye, avgEye * 100, avgEye < 0.40);
+            updateBar('yawn', data.yawn.toFixed(2), data.yawn * 100, data.yawn > 0.99);
+            let pitchPercent = Math.max(0, Math.min(100, (data.pitch + 45) * (100 / 90)));
+            updateBar('pitch', data.pitch.toFixed(1), pitchPercent, data.pitch < -20.0);
+
+            if (data.status === 'calibrating') {
+                mainStatus.innerText = "SCANNING"; mainStatus.className = 'status-text text-cyan';
+                vignette.className = 'alert-vignette scan';
+                subStatus.innerText = `Establishing Driver Baseline... ${data.calib_progress}%`;
+                return;
+            }
+
+            let formattedState = data.status.replace('_', ' ').toUpperCase();
+            mainStatus.innerText = formattedState; mainStatus.className = 'status-text';
+            vignette.className = 'alert-vignette';
+
+            if (data.status === 'drowsy' || data.status === 'head_drop') {
+                mainStatus.classList.add('text-red'); vignette.classList.add('danger');
+                subStatus.innerText = "CRITICAL ALERT TRIGGERED";
+                if (lastState !== data.status) dangerAudio.play().catch(e=>console.log(e));
+            } else if (data.status === 'yawning') {
+                mainStatus.classList.add('text-orange'); vignette.classList.add('warn');
+                subStatus.innerText = "FATIGUE INDICATOR DETECTED";
+                if (lastState !== 'yawning') yawnAudio.play().catch(e=>console.log(e));
+            } else if (data.status === 'active') {
+                mainStatus.classList.add('text-green'); subStatus.innerText = "Driver attentiveness verified";
+            } else if (data.status === 'no_face') {
+                mainStatus.style.color = "var(--text-muted)"; subStatus.innerText = "Face tracking lost";
+            }
+            lastState = data.status;
+        }
+
+        function updateBar(id, textValue, percentWidth, isAlert) {
+            document.getElementById(`val-${id}`).innerText = textValue;
+            let bar = document.getElementById(`bar-${id}`);
+            bar.style.width = `${percentWidth}%`;
+            bar.style.backgroundColor = isAlert ? 'var(--status-red)' : 'var(--accent-blue)';
+            bar.style.boxShadow = isAlert ? '0 0 10px var(--status-red)' : '0 0 10px var(--accent-blue)';
+        }
+
+        function resetTelemetry() {
+            document.getElementById('main-status').innerText = 'STANDBY';
+            document.getElementById('main-status').className = 'status-text';
+            document.getElementById('sub-status').innerText = 'Awaiting camera feed';
+            document.getElementById('vignette').className = 'alert-vignette';
+            updateBar('eye', '0.00', 0, false); updateBar('yawn', '0.00', 0, false); updateBar('pitch', '0.0', 0, false);
+            updateNetwork(new Array(32).fill(0), 'idle');
+        }
+
+        window.addEventListener('resize', () => {
+            const container = document.querySelector('.nn-container');
+            camera.aspect = container.clientWidth / container.clientHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(container.clientWidth, container.clientHeight);
+        });
+    </script>
+</body>
+</html>

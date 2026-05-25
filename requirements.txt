@@ -1,0 +1,10 @@
+fastapi==0.110.0
+uvicorn==0.27.1
+websockets==12.0
+opencv-python-headless==4.9.0.80
+torch==2.2.1
+torchvision==0.17.1
+mediapipe==0.10.11
+protobuf==3.20.3
+numpy==1.26.4
+Pillow==10.2.0
