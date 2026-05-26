@@ -13,7 +13,7 @@ DrowSense is a real-time drowsiness detection system that uses your webcam to mo
 - 🥱 **Yawning** — is the driver showing signs of fatigue through yawning?
 - 📉 **Head drop** — is the driver's head nodding forward?
 
-When any of these are detected, the dashboard triggers an alert. The whole thing runs live in a browser tab — no installation, no app, just open the link and allow camera access.
+When any of these are detected, the dashboard triggers an alert. 
 
 ---
 
@@ -69,7 +69,7 @@ Trained to classify cropped eye regions as **open** or **closed**.
 
 | Metric | Score |
 |---|---|
-| Validation Accuracy | ~98% |
+| Validation Accuracy | 97% |
 | Convergence | Epoch 8 |
 
 ---
@@ -90,7 +90,7 @@ Trained to classify cropped mouth regions as **yawning** or **not yawning**.
 
 | Metric | Score |
 |---|---|
-| Validation Accuracy | ~98% |
+| Validation Accuracy | 98% |
 | Validation Precision | ~0.99 |
 | Validation Recall | ~0.99 |
 
@@ -105,7 +105,7 @@ A detection event is triggered based on three independent checks:
 | Signal | Condition | Threshold |
 |---|---|---|
 | **Drowsy** | Both eyes below confidence threshold | Eye score < 0.40 |
-| **Yawning** | Mouth open with high confidence | Yawn score > 0.99 |
+| **Yawning** | Mouth open with high confidence | Yawn score > 0.90 |
 | **Head Drop** | Head pitch drops below calibrated baseline | >20° drop sustained for 1.5s |
 
 On startup, the system runs a **30-frame calibration** to establish the driver's neutral head position before monitoring begins.
