@@ -1,5 +1,5 @@
 # DrowSense 🚗💤
-### Real-time Driver Drowsiness Detection — runs in your browser, no app install needed.
+### Real-time Driver Drowsiness Detection 
 
 [![Live Demo](https://img.shields.io/badge/Live%20Demo-HuggingFace%20Spaces-blue?style=for-the-badge&logo=huggingface)](https://huggingface.co/spaces/manishvem/DrowSense)
 
