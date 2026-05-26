@@ -28,7 +28,7 @@ DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print(f"[INFO] Server running on: {DEVICE}")
 
 EYE_THRESHOLD = 0.40
-YAWN_THRESHOLD = 0.99
+YAWN_THRESHOLD = 0.90
 DROOP_THRESHOLD_RELATIVE = -20.0
 TIME_THRESHOLD = 1.5
 CALIBRATION_FRAMES = 30
