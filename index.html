@@ -203,8 +203,8 @@
         const canvas = document.getElementById('captureCanvas');
         const ctx = canvas.getContext('2d', { willReadFrequently: true });
 
-        const dangerAudio = new Audio('danger.wav');
-        const yawnAudio = new Audio('yawn.wav');
+        const dangerAudio = new Audio('/static/danger.wav');
+        const yawnAudio = new Audio('/static/yawn.wav');
         dangerAudio.volume = 1.0; yawnAudio.volume = 0.7;
         let lastState = '';
 
